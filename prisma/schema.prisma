@@ -1,0 +1,121 @@
+// Prisma schema for MAHOP Olivier Constantin's portfolio
+// Note: This mirrors the Supabase SQL schema in /supabase/schema.sql
+// SQLite is used locally for development; Supabase (PostgreSQL) is used in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  summary     String
+  description String
+  tags        String   // comma-separated: ML, Data Engineering, GenAI, Web, IoT
+  metrics     String?  // JSON string: { "precision": "98.2%", "recall": "96.8%" }
+  techStack   String   // comma-separated
+  repoUrl     String?
+  demoUrl     String?
+  imageUrl    String?
+  featured    Boolean  @default(false)
+  order       Int      @default(0)
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@index([featured])
+}
+
+model Skill {
+  id        String @id @default(cuid())
+  name      String
+  category  String // Languages, ML/DL, Data Viz, Databases, DevOps, Tools
+  level     Int    // 0-100
+  order     Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
+model Experience {
+  id          String  @id @default(cuid())
+  role        String
+  company     String
+  location    String?
+  startDate   String
+  endDate     String?
+  current     Boolean @default(false)
+  description String
+  situation   String? // STAR: Situation
+  task        String? // STAR: Task
+  actions     String? // STAR: Actions (newline-separated)
+  results     String? // STAR: Results (newline-separated)
+  order       Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Education {
+  id        String @id @default(cuid())
+  diploma   String
+  school    String
+  period    String
+  description String?
+  order     Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Certification {
+  id        String @id @default(cuid())
+  name      String
+  issuer    String
+  year      String
+  url       String?
+  order     Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  read      Boolean  @default(false)
+  replied   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([read])
+  @@index([createdAt])
+}
+
+model PageView {
+  id        String   @id @default(cuid())
+  path      String
+  referrer  String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([path])
+  @@index([createdAt])
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
