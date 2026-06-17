@@ -18,10 +18,15 @@ import { logPageViewAction } from "@/actions/views";
 // Revalidate every 60s — projects/skills stay fresh after admin edits
 export const revalidate = 60;
 
-export default async function Home() {
-  // Fire-and-forget analytics — does not block render
-  logPageViewAction("/").catch(() => {});
+export const dynamic = "force-dynamic";
 
+export default async function Home() {
+  // Fire-and-forget analytics — never block render, never crash
+  try {
+    logPageViewAction("/").catch(() => {});
+  } catch {}
+
+  // Each getter has its own try/catch — never throws, returns [] on failure
   const [projects, skills, experiences, education, certifications] = await Promise.all([
     getProjects(),
     getSkills(),
