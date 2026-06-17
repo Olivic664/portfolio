@@ -3,6 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { getSupabaseAdmin, supabaseEnabled } from "@/lib/supabase";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
@@ -39,15 +40,24 @@ export async function sendMessage(prevState: any, formData: FormData): Promise<C
   }
 
   try {
-    await db.message.create({ data: parsed.data });
-
-    // Optionally send an email notification via Resend / SendGrid.
-    // Left as a stub — uncomment & configure RESEND_API_KEY in production.
-    // await sendNotificationEmail(parsed.data);
+    if (supabaseEnabled) {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) throw new Error("Supabase admin client not configured");
+      const { error } = await supabase.from("messages").insert({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        subject: parsed.data.subject || null,
+        message: parsed.data.message,
+      });
+      if (error) throw error;
+    } else {
+      await db.message.create({ data: parsed.data });
+    }
 
     revalidatePath("/admin");
     return { success: true };
   } catch (e: any) {
+    console.error("[sendMessage] failed:", e);
     return { success: false, error: "Erreur lors de l'envoi du message. Réessayez." };
   }
 }
@@ -58,6 +68,11 @@ async function requireAdmin() {
   if (!session?.user?.email) {
     throw new Error("Non autorisé");
   }
+  if (supabaseEnabled) {
+    // In Supabase mode, any authenticated NextAuth user is admin (since we
+    // control who has credentials via ADMIN_EMAIL env var).
+    return session.user;
+  }
   const admin = await db.adminUser.findUnique({ where: { email: session.user.email } });
   if (!admin) throw new Error("Accès refusé");
   return admin;
@@ -66,7 +81,14 @@ async function requireAdmin() {
 export async function markMessageRead(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     await requireAdmin();
-    await db.message.update({ where: { id }, data: { read: true } });
+    if (supabaseEnabled) {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) throw new Error("Supabase admin client not configured");
+      const { error } = await supabase.from("messages").update({ read: true }).eq("id", id);
+      if (error) throw error;
+    } else {
+      await db.message.update({ where: { id }, data: { read: true } });
+    }
     revalidatePath("/admin");
     return { success: true };
   } catch (e: any) {
@@ -77,7 +99,17 @@ export async function markMessageRead(id: string): Promise<{ success: boolean; e
 export async function markMessageReplied(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     await requireAdmin();
-    await db.message.update({ where: { id }, data: { replied: true, read: true } });
+    if (supabaseEnabled) {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) throw new Error("Supabase admin client not configured");
+      const { error } = await supabase
+        .from("messages")
+        .update({ read: true, replied: true })
+        .eq("id", id);
+      if (error) throw error;
+    } else {
+      await db.message.update({ where: { id }, data: { replied: true, read: true } });
+    }
     revalidatePath("/admin");
     return { success: true };
   } catch (e: any) {
@@ -88,7 +120,14 @@ export async function markMessageReplied(id: string): Promise<{ success: boolean
 export async function deleteMessage(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     await requireAdmin();
-    await db.message.delete({ where: { id } });
+    if (supabaseEnabled) {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) throw new Error("Supabase admin client not configured");
+      const { error } = await supabase.from("messages").delete().eq("id", id);
+      if (error) throw error;
+    } else {
+      await db.message.delete({ where: { id } });
+    }
     revalidatePath("/admin");
     return { success: true };
   } catch (e: any) {
