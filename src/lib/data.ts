@@ -1,6 +1,11 @@
 // src/lib/data.ts
 // Data access layer. In production, swap Prisma calls for Supabase queries.
 // All functions return plain objects (no Prisma types leaking to client).
+//
+// IMPORTANT: All read functions are wrapped in try/catch that return empty arrays
+// on failure. This prevents a serverless DB issue (e.g. cold SQLite, missing
+// volume on Vercel) from breaking the entire page render — the page will still
+// render with empty sections, which is much better than a 500 error.
 
 import { db } from "@/lib/db";
 import type { Project, Skill, Experience, Education, Certification, Message } from "@prisma/client";
@@ -35,86 +40,132 @@ export type MessageItem = Pick<Message, "id" | "name" | "email" | "subject" | "m
 
 // ----- Projects -----
 export async function getProjects(): Promise<ProjectItem[]> {
-  const items = await db.project.findMany({
-    orderBy: [{ featured: "desc" }, { order: "asc" }],
-  });
-  return items.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    title: p.title,
-    summary: p.summary,
-    description: p.description,
-    tags: p.tags,
-    metrics: p.metrics,
-    techStack: p.techStack,
-    repoUrl: p.repoUrl,
-    demoUrl: p.demoUrl,
-    imageUrl: p.imageUrl,
-    featured: p.featured,
-    order: p.order,
-    views: p.views,
-  }));
+  try {
+    return await db.project.findMany({
+      orderBy: [{ featured: "desc" }, { order: "asc" }],
+    });
+  } catch (e) {
+    console.error("[data] getProjects failed:", e);
+    return [];
+  }
 }
 
 export async function getFeaturedProjects(): Promise<ProjectItem[]> {
-  const items = await db.project.findMany({
-    where: { featured: true },
-    orderBy: { order: "asc" },
-  });
-  return items;
+  try {
+    return await db.project.findMany({
+      where: { featured: true },
+      orderBy: { order: "asc" },
+    });
+  } catch (e) {
+    console.error("[data] getFeaturedProjects failed:", e);
+    return [];
+  }
 }
 
 export async function getProjectBySlug(slug: string): Promise<ProjectItem | null> {
-  return db.project.findUnique({ where: { slug } });
+  try {
+    return await db.project.findUnique({ where: { slug } });
+  } catch (e) {
+    console.error("[data] getProjectBySlug failed:", e);
+    return null;
+  }
 }
 
 export async function incrementProjectViews(slug: string): Promise<void> {
-  await db.project.update({
-    where: { slug },
-    data: { views: { increment: 1 } },
-  });
+  try {
+    await db.project.update({
+      where: { slug },
+      data: { views: { increment: 1 } },
+    });
+  } catch (e) {
+    console.error("[data] incrementProjectViews failed:", e);
+  }
 }
 
 // ----- Skills -----
 export async function getSkills(): Promise<SkillItem[]> {
-  return db.skill.findMany({ orderBy: [{ category: "asc" }, { order: "asc" }] });
+  try {
+    return await db.skill.findMany({ orderBy: [{ category: "asc" }, { order: "asc" }] });
+  } catch (e) {
+    console.error("[data] getSkills failed:", e);
+    return [];
+  }
 }
 
 // ----- Experiences -----
 export async function getExperiences(): Promise<ExperienceItem[]> {
-  return db.experience.findMany({ orderBy: { order: "asc" } }) as Promise<ExperienceItem[]>;
+  try {
+    return (await db.experience.findMany({ orderBy: { order: "asc" } })) as ExperienceItem[];
+  } catch (e) {
+    console.error("[data] getExperiences failed:", e);
+    return [];
+  }
 }
 
 // ----- Education -----
 export async function getEducation(): Promise<EducationItem[]> {
-  return db.education.findMany({ orderBy: { order: "asc" } });
+  try {
+    return await db.education.findMany({ orderBy: { order: "asc" } });
+  } catch (e) {
+    console.error("[data] getEducation failed:", e);
+    return [];
+  }
 }
 
 // ----- Certifications -----
 export async function getCertifications(): Promise<CertificationItem[]> {
-  return db.certification.findMany({ orderBy: { order: "asc" } });
+  try {
+    return await db.certification.findMany({ orderBy: { order: "asc" } });
+  } catch (e) {
+    console.error("[data] getCertifications failed:", e);
+    return [];
+  }
 }
 
 // ----- Messages -----
 export async function getMessages(): Promise<MessageItem[]> {
-  return db.message.findMany({ orderBy: { createdAt: "desc" } });
+  try {
+    return await db.message.findMany({ orderBy: { createdAt: "desc" } });
+  } catch (e) {
+    console.error("[data] getMessages failed:", e);
+    return [];
+  }
 }
 
 export async function getUnreadMessageCount(): Promise<number> {
-  return db.message.count({ where: { read: false } });
+  try {
+    return await db.message.count({ where: { read: false } });
+  } catch (e) {
+    console.error("[data] getUnreadMessageCount failed:", e);
+    return 0;
+  }
 }
 
 // ----- Page views (analytics) -----
 export async function logPageView(path: string, referrer?: string, userAgent?: string): Promise<void> {
-  await db.pageView.create({ data: { path, referrer, userAgent } });
+  try {
+    await db.pageView.create({ data: { path, referrer, userAgent } });
+  } catch (e) {
+    console.error("[data] logPageView failed:", e);
+  }
 }
 
 export async function getPageViewsByPath(path: string): Promise<number> {
-  return db.pageView.count({ where: { path } });
+  try {
+    return await db.pageView.count({ where: { path } });
+  } catch (e) {
+    console.error("[data] getPageViewsByPath failed:", e);
+    return 0;
+  }
 }
 
 export async function getTotalPageViews(): Promise<number> {
-  return db.pageView.count();
+  try {
+    return await db.pageView.count();
+  } catch (e) {
+    console.error("[data] getTotalPageViews failed:", e);
+    return 0;
+  }
 }
 
 // ----- Helpers for serialization -----
